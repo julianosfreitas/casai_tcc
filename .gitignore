@@ -1,0 +1,46 @@
+# Dependências
+node_modules/
+.pnp/
+.pnp.js
+
+# Build
+dist/
+build/
+.expo/
+*.tsbuildinfo
+
+# Ambiente e segredos — CRÍTICO
+.env
+.env.local
+.env.*.local
+*.pem
+*.key
+credentials.json
+
+# Prisma
+prisma/*.db
+prisma/migrations/dev.db*
+
+# Logs
+*.log
+npm-debug.log*
+logs/
+
+# Testes
+coverage/
+.nyc_output/
+
+# IDE / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# Spikes (credenciais hardcoded podem aparecer aqui durante validação)
+spikes/*.local.ts
+
+# Áudio de teste de voz (não versionar gravações pessoais)
+*.wav
+*.mp3
+!test/fixtures/voice/*.wav
