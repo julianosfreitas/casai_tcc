@@ -3,17 +3,13 @@ import { DevicesService } from './devices.service';
 import { DevicesController } from './devices.controller';
 import { DeviceAdapterFactory } from './device-adapter.factory';
 import { DeviceCommandQueue } from './device-command.queue';
-import { DeviceEvents, NoopDeviceEvents } from './device-events';
+import { WebsocketModule } from '../websocket/websocket.module';
 
 @Module({
+  // WebsocketModule fornece DeviceEvents (o gateway real).
+  imports: [WebsocketModule],
   controllers: [DevicesController],
-  providers: [
-    DevicesService,
-    DeviceAdapterFactory,
-    DeviceCommandQueue,
-    // No-op por enquanto; o gateway WebSocket substitui no Passo 5.
-    { provide: DeviceEvents, useClass: NoopDeviceEvents },
-  ],
+  providers: [DevicesService, DeviceAdapterFactory, DeviceCommandQueue],
   exports: [DevicesService, DeviceAdapterFactory, DeviceCommandQueue],
 })
 export class DevicesModule {}
