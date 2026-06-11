@@ -1,76 +1,102 @@
-import { PrismaClient, DeviceType, Protocol, DeviceStatus } from '@prisma/client';
+import {
+  PrismaClient,
+  Prisma,
+  DeviceType,
+  Protocol,
+  DeviceStatus,
+  TriggerType,
+} from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
+import {
+  DEMO_AUTOMATIONS,
+  DEMO_DEVICES,
+  DEMO_ROOMS,
+  DEMO_SCENES,
+  DEMO_USER,
+  resolveActions,
+} from '../src/demo/demo-data';
 
 const prisma = new PrismaClient();
 
 async function main(): Promise<void> {
-  const email = 'dev@casai.local';
-  const passwordHash = await bcrypt.hash('Senha@123', 10);
-
+  const passwordHash = await bcrypt.hash(DEMO_USER.password, 10);
   const user = await prisma.user.upsert({
-    where: { email },
+    where: { email: DEMO_USER.email },
     update: {},
-    create: { email, name: 'Dev CASAI', passwordHash },
+    create: { email: DEMO_USER.email, name: DEMO_USER.name, passwordHash },
   });
-  console.log(`✓ Usuário de teste: ${email} / Senha@123`);
+  console.log(`✓ Usuário de teste: ${DEMO_USER.email} / ${DEMO_USER.password}`);
 
-  // 3 cômodos
-  const roomData = [
-    { name: 'Sala', order: 0 },
-    { name: 'Quarto', order: 1 },
-    { name: 'Cozinha', order: 2 },
-  ];
-  const rooms: Record<string, string> = {};
-  for (const r of roomData) {
+  const roomIdByName: Record<string, string> = {};
+  for (const r of DEMO_ROOMS) {
     const room = await prisma.room.upsert({
       where: { userId_name: { userId: user.id, name: r.name } },
       update: { order: r.order },
       create: { name: r.name, order: r.order, userId: user.id },
     });
-    rooms[r.name] = room.id;
+    roomIdByName[r.name] = room.id;
   }
-  console.log('✓ Cômodos: Sala, Quarto, Cozinha');
+  console.log(`✓ Cômodos: ${DEMO_ROOMS.map((r) => r.name).join(', ')}`);
 
-  // Dispositivo MOCK LIGHT na Sala
-  const existingLight = await prisma.device.findFirst({
-    where: { userId: user.id, name: 'Luz da Sala (MOCK)' },
-  });
-  if (!existingLight) {
-    await prisma.device.create({
+  const deviceIdByName: Record<string, string> = {};
+  for (const d of DEMO_DEVICES) {
+    const existing = await prisma.device.findFirst({
+      where: { userId: user.id, name: d.name },
+    });
+    const device =
+      existing ??
+      (await prisma.device.create({
+        data: {
+          name: d.name,
+          type: DeviceType[d.type],
+          protocol: Protocol.MOCK,
+          status: DeviceStatus.ONLINE,
+          supportsBrightness: d.supportsBrightness ?? false,
+          supportsColor: d.supportsColor ?? false,
+          supportsColorTemp: d.supportsColorTemp ?? false,
+          supportsEnergy: d.supportsEnergy ?? false,
+          roomId: roomIdByName[d.room],
+          userId: user.id,
+          lastState: d.lastState,
+        },
+      }));
+    deviceIdByName[d.name] = device.id;
+  }
+  console.log(`✓ Dispositivos MOCK: ${DEMO_DEVICES.map((d) => d.name).join(', ')}`);
+
+  for (const a of DEMO_AUTOMATIONS) {
+    const exists = await prisma.automation.findFirst({
+      where: { userId: user.id, name: a.name },
+    });
+    if (exists) continue;
+    await prisma.automation.create({
       data: {
-        name: 'Luz da Sala (MOCK)',
-        type: DeviceType.LIGHT,
-        protocol: Protocol.MOCK,
-        status: DeviceStatus.ONLINE,
-        supportsBrightness: true,
-        supportsColor: true,
-        supportsColorTemp: true,
-        roomId: rooms['Sala'],
+        name: a.name,
         userId: user.id,
-        lastState: { on: false, brightness: 80 },
+        enabled: true,
+        triggerType: TriggerType.SCHEDULE,
+        triggerConfig: a.triggerConfig as unknown as Prisma.InputJsonValue,
+        actions: resolveActions(a.actions, deviceIdByName) as Prisma.InputJsonValue,
       },
     });
   }
+  console.log(`✓ Rotinas: ${DEMO_AUTOMATIONS.map((a) => a.name).join(' · ')}`);
 
-  // Dispositivo MOCK PLUG (com energia) na Cozinha
-  const existingPlug = await prisma.device.findFirst({
-    where: { userId: user.id, name: 'Tomada da Cozinha (MOCK)' },
-  });
-  if (!existingPlug) {
-    await prisma.device.create({
+  for (const s of DEMO_SCENES) {
+    const exists = await prisma.scene.findFirst({
+      where: { userId: user.id, name: s.name },
+    });
+    if (exists) continue;
+    await prisma.scene.create({
       data: {
-        name: 'Tomada da Cozinha (MOCK)',
-        type: DeviceType.PLUG,
-        protocol: Protocol.MOCK,
-        status: DeviceStatus.ONLINE,
-        supportsEnergy: true,
-        roomId: rooms['Cozinha'],
+        name: s.name,
+        icon: s.icon,
         userId: user.id,
-        lastState: { on: true },
+        actions: resolveActions(s.actions, deviceIdByName) as Prisma.InputJsonValue,
       },
     });
   }
-  console.log('✓ Dispositivos MOCK: 1 LIGHT (Sala), 1 PLUG c/ energia (Cozinha)');
+  console.log(`✓ Cenas: ${DEMO_SCENES.map((s) => s.name).join(' · ')}`);
 }
 
 main()

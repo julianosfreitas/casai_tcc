@@ -13,6 +13,8 @@ import { ScenesModule } from './scenes/scenes.module';
 import { EnergyModule } from './energy/energy.module';
 import { VoiceModule } from './voice/voice.module';
 import { WebsocketModule } from './websocket/websocket.module';
+import { GamificationModule } from './gamification/gamification.module';
+import { DemoModule } from './demo/demo.module';
 
 @Module({
   imports: [
@@ -27,11 +29,15 @@ import { WebsocketModule } from './websocket/websocket.module';
     AuthModule,
     UsersModule,
     DevicesModule,
+    // DemoModule ANTES do AutomationsModule: o seed do DEMO_MODE roda no
+    // onModuleInit e o agendador (Automations) registra os crons em seguida.
+    DemoModule,
     AutomationsModule,
     ScenesModule,
     EnergyModule,
     VoiceModule,
     WebsocketModule,
+    GamificationModule,
   ],
   controllers: [HealthController],
 })
