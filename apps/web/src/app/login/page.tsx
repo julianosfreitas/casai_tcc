@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { api, setTokens } from '@/lib/api';
+import { GoogleSignInButton } from '@/components/google-sign-in-button';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -16,6 +17,18 @@ export default function LoginPage() {
   const [name, setName] = React.useState('');
   const [password, setPassword] = React.useState('Senha@123');
   const [loading, setLoading] = React.useState(false);
+
+  async function googleSignIn(idToken: string) {
+    setLoading(true);
+    try {
+      const tokens = await api.googleSignIn(idToken);
+      setTokens(tokens.accessToken, tokens.refreshToken);
+      router.replace('/dashboard');
+    } catch (err) {
+      toast.error((err as Error).message);
+      setLoading(false);
+    }
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -77,6 +90,12 @@ export default function LoginPage() {
               {loading ? 'Aguarde…' : mode === 'signin' ? 'Entrar' : 'Cadastrar'}
             </Button>
           </form>
+          <div className="my-4 flex items-center gap-3">
+            <div className="h-px flex-1 bg-border" />
+            <span className="text-xs text-muted-foreground">ou</span>
+            <div className="h-px flex-1 bg-border" />
+          </div>
+          <GoogleSignInButton onCredential={googleSignIn} />
           <button
             type="button"
             onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}

@@ -58,9 +58,12 @@ enum ActionType {
 // ───────────────────────── Modelos ─────────────────────────
 
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  passwordHash String
+  id           String  @id @default(uuid())
+  email        String  @unique
+  // Nulo quando a conta foi criada via Google (não há senha local).
+  passwordHash String?
+  // `sub` do ID token do Google — identifica a conta Google vinculada.
+  googleId     String? @unique
   name         String
   // tarifa de energia em R$/kWh (média Brasil ~0.92). Usada no cálculo de custo.
   energyRate   Float    @default(0.92)

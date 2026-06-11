@@ -53,6 +53,21 @@ npm run start:dev                     # API em http://localhost:4000  (Swagger e
 | `WHISPER_MODEL` / `WHISPER_LANGUAGE` | STT no hub (padrão `small` / `pt`) |
 | `ENERGY_POLL_INTERVAL_SECONDS` | intervalo do polling de energia |
 | `WEB_ORIGIN` | origem permitida no CORS |
+| `GOOGLE_CLIENT_ID` | login com Google (opcional — sem ele, `/auth/google` responde 503) |
+
+### Login com Google (opcional)
+
+1. Crie um **OAuth Client ID** (tipo *Web application*) em
+   [console.cloud.google.com/apis/credentials](https://console.cloud.google.com/apis/credentials).
+2. Em *Authorized JavaScript origins*, adicione `http://localhost:3000` (dev) e a
+   URL pública do deploy.
+3. Coloque o MESMO valor em `GOOGLE_CLIENT_ID` (API) e
+   `NEXT_PUBLIC_GOOGLE_CLIENT_ID` (web, em `apps/web/.env.local`).
+
+Sem as variáveis o botão "Entrar com o Google" simplesmente não aparece e o login
+local por e-mail/senha continua funcionando. Contas Google são criadas sem senha
+local (`passwordHash` nulo) e vinculadas pelo `googleId`; se já existir conta com
+o mesmo e-mail (verificado pelo Google), ela é vinculada em vez de duplicada.
 
 ## 3. Web (apps/web)
 
@@ -120,7 +135,7 @@ cobertura + `npm audit` (falha em alta/crítica) + secret scanning (gitleaks).
 
 ## Endpoints principais (API, prefixo `/api`)
 
-- `POST /auth/sign_up | sign_in | refresh | sign_out`, `GET /auth/me`
+- `POST /auth/sign_up | sign_in | google | refresh | sign_out`, `GET /auth/me`
 - `GET/POST/PATCH/DELETE /devices`, `POST /devices/:id/command`, `POST /devices/discover`
 - `GET /devices/:id/energy/history`, `GET /energy/summary`
 - `POST /voice/transcribe`, `POST /voice/command`

@@ -28,6 +28,11 @@ class EnvironmentVariables {
   @IsOptional()
   @IsInt()
   PORT?: number;
+
+  // Opcional: sem ele, POST /auth/google responde 503 (login com Google desativado).
+  @IsString()
+  @IsOptional()
+  GOOGLE_CLIENT_ID?: string;
 }
 
 export function validateEnv(config: Record<string, unknown>): EnvironmentVariables {
