@@ -13,13 +13,26 @@ menos de R$ 200 em hardware, sem depender de nuvem nem de conhecimento técnico.
 ## 2. Stack (DECIDIDA — não trocar sem registrar um ADR)
 
 - **Backend:** Node.js 20 LTS + TypeScript + NestJS + Prisma + PostgreSQL 16
-- **Frontend:** React Native + Expo (development build, NÃO Expo Go)
+- **Frontend:** Next.js 15 + React 19 + **PWA instalável no celular** (ADR-002 —
+  substituiu o plano original de Expo/React Native durante o build)
 - **Tempo real:** WebSocket (Socket.IO)
-- **IoT:** `tuyapi` (Tuya/Intelbras) · `tp-link-tapo-connect` (Tapo) · MQTT (Zigbee, fase 2)
+- **IoT:** `tuyapi` (Tuya/Intelbras — Intelbras Izy É Tuya white-label, mesmo protocolo)
+  · `tp-link-tapo-connect` (Tapo) · MQTT (Zigbee, fase 2)
 - **Voz (STT):** Whisper rodando NO BACKEND/hub — nunca no celular
-- **Testes:** Jest + supertest (backend) · Testing Library (mobile)
-- **Estado mobile:** TanStack Query + Zustand
-- **Estilo mobile:** NativeWind (Tailwind) · fontes Space Grotesk + Inter
+- **Testes:** Jest + supertest (backend) · Testing Library (web)
+- **Estado web:** TanStack Query (server state) — sem Zustand no MVP
+- **Estilo web:** Tailwind 4 + shadcn/ui · tema monocromático neutro
+  (light branco/preto, dark `#0a0a0a`), azul SOMENTE nos gráficos (`--chart-1..5`),
+  sem neon/amarelo/glow
+
+### ADRs (decisões registradas)
+
+- **ADR-001 — Não usar Home Assistant como núcleo.** O hub CASAI é a contribuição
+  do TCC; HA entra na monografia só como trabalho relacionado. Não existe "API
+  Intelbras" separada: a linha Izy é Tuya white-label, coberta pelo `tuyapi`.
+- **ADR-002 — Frontend é web PWA (Next.js), não Expo.** O app "no celular" é o
+  PWA instalado (Add to Home Screen). Os trechos sobre Expo/NativeWind abaixo
+  são históricos.
 
 ## 3. Hardware-alvo (já adquirido)
 
@@ -64,7 +77,7 @@ casai/
 │   │   │   └── websocket/
 │   │   ├── prisma/schema.prisma
 │   │   └── test/
-│   └── mobile/              # Expo app
+│   └── web/                 # Next.js 15 PWA (dashboard, rotinas, dispositivos)
 ├── packages/types/          # tipos TS compartilhados
 ├── spikes/                  # scripts de validação (descartáveis)
 └── docker-compose.yml
@@ -96,13 +109,12 @@ npx prisma migrate dev     # aplicar migrations em dev
 npx prisma studio          # GUI do banco
 npx prisma db seed         # popular dados de teste (inclui devices MOCK)
 
-# Mobile
-cd apps/mobile && npx expo start
+# Web
+cd apps/web && npm run dev    # http://localhost:3000
 ```
 
 ## 8. Lista de "NÃO FAÇA"
 
-- NÃO use Expo Go (precisamos de módulos nativos — use development build).
 - NÃO chame libs de IoT fora dos adapters.
 - NÃO commite `.env`, `local_key`, ou qualquer credencial.
 - NÃO implemente Zigbee, Matter ou controle remoto fora da LAN no MVP (é fase futura).

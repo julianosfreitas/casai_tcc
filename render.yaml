@@ -1,0 +1,38 @@
+# Blueprint do Render (https://render.com) — deploy público de demonstração do TCC.
+# Conecte o repositório no Render e ele lê este arquivo ("New > Blueprint").
+# Plano free: a API dorme após 15 min sem tráfego (acorda em ~30-50s) — ok para demo.
+services:
+  - type: web
+    name: casai-api
+    runtime: node
+    plan: free
+    rootDir: apps/api
+    buildCommand: npm ci && npx prisma generate && npm run build
+    startCommand: npx prisma migrate deploy && node dist/main.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: casai-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      # 64 hex (32 bytes). Gere com:
+      #   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+      # e cole no dashboard do Render (sync: false = pede o valor na criação).
+      - key: CASAI_ENCRYPTION_KEY
+        sync: false
+      # DEMO_MODE: semeia usuário demo + dispositivos MOCK + rotinas no boot.
+      - key: DEMO_MODE
+        value: 'true'
+      # Troque pela URL final da web na Vercel (CORS).
+      - key: WEB_ORIGIN
+        sync: false
+      - key: ENERGY_POLL_INTERVAL_SECONDS
+        value: '15'
+
+databases:
+  - name: casai-db
+    plan: free
+    databaseName: casai
+    user: casai
