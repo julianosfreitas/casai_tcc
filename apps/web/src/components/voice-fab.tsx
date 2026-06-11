@@ -14,7 +14,7 @@ type State = 'idle' | 'recording' | 'processing';
  * FAB de microfone: captura ~3s de áudio (MediaRecorder / Web Audio API) e envia
  * para POST /voice/command, onde o Whisper no hub transcreve e o intent é executado.
  */
-export function VoiceFab() {
+export function VoiceFab({ className }: { className?: string }) {
   const [state, setState] = React.useState<State>('idle');
   const qc = useQueryClient();
 
@@ -64,8 +64,9 @@ export function VoiceFab() {
       disabled={state === 'processing'}
       aria-label="Comando de voz"
       className={cn(
-        'fixed bottom-6 right-6 shadow-lg',
+        'fixed bottom-6 right-6 z-50 shadow-lg',
         state === 'recording' && 'animate-pulse bg-destructive',
+        className,
       )}
     >
       {state === 'processing' ? (

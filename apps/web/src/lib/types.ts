@@ -59,6 +59,55 @@ export interface EnergyBucket {
   samples: number;
 }
 
+export interface AutomationAction {
+  deviceId: string;
+  command: string;
+  brightness?: number;
+  color?: string;
+  colorTemp?: number;
+  delaySeconds?: number;
+}
+
+export interface Automation {
+  id: string;
+  name: string;
+  enabled: boolean;
+  triggerType: 'SCHEDULE' | 'MANUAL';
+  triggerConfig: { time?: string; cron?: string; weekdays?: number[] };
+  actions: AutomationAction[];
+  conditions: unknown[];
+}
+
+export interface Scene {
+  id: string;
+  name: string;
+  icon: string | null;
+  actions: AutomationAction[];
+}
+
+export interface Achievement {
+  id: string;
+  title: string;
+  description: string;
+  icon: string;
+  unlocked: boolean;
+}
+
+export interface GamificationSummary {
+  points: number;
+  level: { index: number; name: string; minPoints: number; nextAt: number | null };
+  progress: number;
+  achievements: Achievement[];
+  stats: {
+    devices: number;
+    realDevices: number;
+    automations: number;
+    scenes: number;
+    voiceOk: number;
+    energyReadings: number;
+  };
+}
+
 export interface VoiceResult {
   transcript: string;
   intent: string;

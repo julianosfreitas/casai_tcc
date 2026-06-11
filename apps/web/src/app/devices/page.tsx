@@ -1,16 +1,14 @@
 'use client';
 
 import * as React from 'react';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowLeft, Lightbulb, Plug, Power, Trash2, Wifi } from 'lucide-react';
+import { Lightbulb, Plug, Power, Trash2, Wifi } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { ModeToggle } from '@/components/mode-toggle';
-import { api, getToken } from '@/lib/api';
+import { AppShell } from '@/components/app-shell';
+import { api } from '@/lib/api';
 import type { CreateDevicePayload, Device, DeviceType, Protocol } from '@/lib/types';
 
 const PROTOCOL_LABEL: Record<string, string> = {
@@ -66,21 +64,11 @@ const EMPTY_FORM: FormState = {
 };
 
 export default function DevicesPage() {
-  const router = useRouter();
   const qc = useQueryClient();
-  const [ready, setReady] = React.useState(false);
   const [protocol, setProtocol] = React.useState<Protocol>('TUYA');
   const [form, setForm] = React.useState<FormState>({ ...EMPTY_FORM, ...PROTOCOL_PRESETS.TUYA });
 
-  React.useEffect(() => {
-    if (!getToken()) {
-      router.replace('/login');
-    } else {
-      setReady(true);
-    }
-  }, [router]);
-
-  const devices = useQuery({ queryKey: ['devices'], queryFn: api.devices, enabled: ready });
+  const devices = useQuery({ queryKey: ['devices'], queryFn: api.devices });
 
   const create = useMutation({
     mutationFn: (payload: CreateDevicePayload) => api.createDevice(payload),
@@ -88,6 +76,7 @@ export default function DevicesPage() {
       toast.success(`"${d.name}" cadastrado`);
       setForm({ ...EMPTY_FORM, ...PROTOCOL_PRESETS[protocol] });
       void qc.invalidateQueries({ queryKey: ['devices'] });
+      void qc.invalidateQueries({ queryKey: ['gamification'] });
     },
     onError: (e) => toast.error(e.message),
   });
@@ -147,27 +136,8 @@ export default function DevicesPage() {
     create.mutate(payload);
   }
 
-  if (!ready) return null;
-
   return (
-    <main className="mx-auto min-h-dvh max-w-5xl p-4 sm:p-6">
-      <header className="mb-6 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <Button variant="outline" size="icon" asChild aria-label="Voltar ao painel">
-            <Link href="/dashboard">
-              <ArrowLeft className="h-5 w-5" />
-            </Link>
-          </Button>
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">Dispositivos</h1>
-            <p className="text-sm text-muted-foreground">
-              Conecte aparelhos Tuya/Intelbras, Tapo ou simulados
-            </p>
-          </div>
-        </div>
-        <ModeToggle />
-      </header>
-
+    <AppShell title="Dispositivos" subtitle="Conecte aparelhos Tuya/Intelbras, Tapo ou simulados">
       {/* Cadastro guiado por protocolo */}
       <Card className="mb-6">
         <CardHeader>
@@ -338,7 +308,7 @@ export default function DevicesPage() {
           />
         ))}
       </section>
-    </main>
+    </AppShell>
   );
 }
 

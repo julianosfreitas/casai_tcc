@@ -2,34 +2,24 @@
 
 import * as React from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { LogOut, Zap, Gauge, TrendingUp, Plug } from 'lucide-react';
+import { Zap, Gauge, TrendingUp, Play } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ModeToggle } from '@/components/mode-toggle';
+import { AppShell } from '@/components/app-shell';
 import { DeviceWidget } from '@/components/device-widget';
 import { EnergyChart } from '@/components/energy-chart';
-import { VoiceFab } from '@/components/voice-fab';
-import { api, getToken, clearTokens } from '@/lib/api';
-import { getSocket, disconnectSocket } from '@/lib/socket';
+import { api } from '@/lib/api';
+import { getSocket } from '@/lib/socket';
 import { formatBRL } from '@/lib/utils';
 
 export default function DashboardPage() {
-  const router = useRouter();
   const qc = useQueryClient();
-  const [ready, setReady] = React.useState(false);
 
-  React.useEffect(() => {
-    if (!getToken()) {
-      router.replace('/login');
-    } else {
-      setReady(true);
-    }
-  }, [router]);
-
-  const devices = useQuery({ queryKey: ['devices'], queryFn: api.devices, enabled: ready });
-  const summary = useQuery({ queryKey: ['energy'], queryFn: api.energySummary, enabled: ready });
+  const devices = useQuery({ queryKey: ['devices'], queryFn: api.devices });
+  const summary = useQuery({ queryKey: ['energy'], queryFn: api.energySummary });
+  const scenes = useQuery({ queryKey: ['scenes'], queryFn: api.scenes });
 
   const energyDevice = devices.data?.find((d) => d.supportsEnergy);
   const history = useQuery({
@@ -40,7 +30,6 @@ export default function DashboardPage() {
 
   // Tempo real: atualiza ao receber mudanças de estado/energia.
   React.useEffect(() => {
-    if (!ready) return;
     const socket = getSocket();
     const refresh = () => void qc.invalidateQueries({ queryKey: ['devices'] });
     socket.on('device:status_changed', refresh);
@@ -54,41 +43,49 @@ export default function DashboardPage() {
       socket.off('device:offline', refresh);
       socket.off('energy:reading');
     };
-  }, [ready, qc]);
+  }, [qc]);
 
-  function logout() {
-    clearTokens();
-    disconnectSocket();
-    router.replace('/login');
+  async function activateScene(id: string, name: string) {
+    try {
+      await api.activateScene(id);
+      toast.success(`Cena "${name}" ativada`);
+      void qc.invalidateQueries({ queryKey: ['devices'] });
+    } catch (err) {
+      toast.error((err as Error).message);
+    }
   }
 
-  if (!ready) return null;
-
   return (
-    <main className="mx-auto min-h-dvh max-w-5xl p-4 sm:p-6">
-      <header className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">CASAI</h1>
-          <p className="text-sm text-muted-foreground">Sua casa, no controle</p>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" asChild>
-            <Link href="/devices">
-              <Plug className="h-4 w-4 sm:mr-1" />
-              <span className="hidden sm:inline">Dispositivos</span>
-            </Link>
-          </Button>
-          <ModeToggle />
-          <Button variant="outline" size="icon" onClick={logout} aria-label="Sair">
-            <LogOut className="h-5 w-5" />
-          </Button>
-        </div>
-      </header>
+    <AppShell title="CASAI" subtitle="Sua casa, no controle">
+      {/* Cenas em um toque */}
+      {scenes.data && scenes.data.length > 0 && (
+        <section className="mb-6 flex gap-2 overflow-x-auto pb-1">
+          {scenes.data.map((s) => (
+            <Button
+              key={s.id}
+              variant="outline"
+              className="shrink-0"
+              onClick={() => void activateScene(s.id, s.name)}
+            >
+              <Play className="mr-1.5 h-3.5 w-3.5 text-chart-2" />
+              {s.name}
+            </Button>
+          ))}
+        </section>
+      )}
 
       {/* Resumo de energia (bento) */}
       <section className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        <StatCard icon={<Gauge className="h-5 w-5" />} label="Agora" value={`${summary.data?.totalWatts ?? 0} W`} />
-        <StatCard icon={<Zap className="h-5 w-5" />} label="Hoje" value={`${summary.data?.kwhToday ?? 0} kWh`} />
+        <StatCard
+          icon={<Gauge className="h-5 w-5" />}
+          label="Agora"
+          value={`${summary.data?.totalWatts ?? 0} W`}
+        />
+        <StatCard
+          icon={<Zap className="h-5 w-5" />}
+          label="Hoje"
+          value={`${summary.data?.kwhToday ?? 0} kWh`}
+        />
         <StatCard
           icon={<Zap className="h-5 w-5" />}
           label="Custo hoje"
@@ -128,9 +125,7 @@ export default function DashboardPage() {
           <DeviceWidget key={device.id} device={device} />
         ))}
       </section>
-
-      <VoiceFab />
-    </main>
+    </AppShell>
   );
 }
 

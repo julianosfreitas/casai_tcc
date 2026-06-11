@@ -18,6 +18,19 @@ export default function LoginPage() {
   const [password, setPassword] = React.useState('Senha@123');
   const [loading, setLoading] = React.useState(false);
 
+  /** Um toque para a banca: entra com o usuário de demonstração do seed. */
+  async function demoSignIn() {
+    setLoading(true);
+    try {
+      const tokens = await api.signIn('dev@casai.local', 'Senha@123');
+      setTokens(tokens.accessToken, tokens.refreshToken);
+      router.replace('/dashboard');
+    } catch (err) {
+      toast.error((err as Error).message);
+      setLoading(false);
+    }
+  }
+
   async function googleSignIn(idToken: string) {
     setLoading(true);
     try {
@@ -96,6 +109,15 @@ export default function LoginPage() {
             <div className="h-px flex-1 bg-border" />
           </div>
           <GoogleSignInButton onCredential={googleSignIn} />
+          <Button
+            type="button"
+            variant="outline"
+            className="mt-2 w-full"
+            onClick={demoSignIn}
+            disabled={loading}
+          >
+            🚀 Entrar como demonstração
+          </Button>
           <button
             type="button"
             onClick={() => setMode(mode === 'signin' ? 'signup' : 'signin')}

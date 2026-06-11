@@ -1,9 +1,13 @@
 import type {
+  Automation,
+  AutomationAction,
   CreateDevicePayload,
   Device,
   DeviceState,
   EnergyBucket,
   EnergySummary,
+  GamificationSummary,
+  Scene,
   VoiceResult,
 } from './types';
 
@@ -75,6 +79,36 @@ export const api = {
       method: 'POST',
       body: JSON.stringify({ command, ...extra }),
     }),
+
+  automations: () => request<Automation[]>('/automations'),
+
+  createAutomation: (payload: {
+    name: string;
+    triggerType: 'SCHEDULE' | 'MANUAL';
+    triggerConfig: { time?: string; weekdays?: number[] };
+    actions: AutomationAction[];
+  }) => request<Automation>('/automations', { method: 'POST', body: JSON.stringify(payload) }),
+
+  updateAutomation: (id: string, payload: Partial<{ enabled: boolean; name: string }>) =>
+    request<Automation>(`/automations/${id}`, { method: 'PATCH', body: JSON.stringify(payload) }),
+
+  deleteAutomation: (id: string) =>
+    request<{ ok: true }>(`/automations/${id}`, { method: 'DELETE' }),
+
+  runAutomation: (id: string) =>
+    request<unknown>(`/automations/${id}/run`, { method: 'POST' }),
+
+  scenes: () => request<Scene[]>('/scenes'),
+
+  createScene: (payload: { name: string; icon?: string; actions: AutomationAction[] }) =>
+    request<Scene>('/scenes', { method: 'POST', body: JSON.stringify(payload) }),
+
+  deleteScene: (id: string) => request<{ ok: true }>(`/scenes/${id}`, { method: 'DELETE' }),
+
+  activateScene: (id: string) =>
+    request<unknown>(`/scenes/${id}/activate`, { method: 'POST' }),
+
+  gamification: () => request<GamificationSummary>('/gamification/summary'),
 
   energySummary: () => request<EnergySummary>('/energy/summary'),
 
