@@ -1,13 +1,16 @@
-import { Injectable, UnauthorizedException } from '@nestjs/common';
+import { Injectable, ServiceUnavailableException, UnauthorizedException } from '@nestjs/common';
 import { JwtService, type JwtSignOptions } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { createHash, randomUUID } from 'node:crypto';
+import { OAuth2Client, type TokenPayload } from 'google-auth-library';
 import { UsersService } from '../users/users.service';
 import { PrismaService } from '../prisma/prisma.service';
 import type { AuthTokens, AuthUser, JwtPayload } from './auth.types';
 
 @Injectable()
 export class AuthService {
+  private readonly googleClient = new OAuth2Client();
+
   constructor(
     private readonly users: UsersService,
     private readonly prisma: PrismaService,
@@ -22,10 +25,43 @@ export class AuthService {
 
   async signIn(email: string, password: string): Promise<AuthTokens> {
     const user = await this.users.findByEmail(email);
-    // Mesma mensagem para e-mail inexistente e senha errada (evita enumeração de contas).
-    if (!user || !(await this.users.verifyPassword(password, user.passwordHash))) {
+    // Mesma mensagem para e-mail inexistente, conta só-Google (sem senha) e senha
+    // errada (evita enumeração de contas).
+    if (
+      !user ||
+      !user.passwordHash ||
+      !(await this.users.verifyPassword(password, user.passwordHash))
+    ) {
       throw new UnauthorizedException('E-mail ou senha incorretos');
     }
+    return this.issueTokens(user.id, user.email);
+  }
+
+  /**
+   * Login com Google: valida o ID token (credential do botão Google Identity
+   * Services) contra o nosso client ID e emite os tokens do CASAI.
+   */
+  async signInWithGoogle(idToken: string): Promise<AuthTokens> {
+    const clientId = this.config.get<string>('GOOGLE_CLIENT_ID');
+    if (!clientId) {
+      throw new ServiceUnavailableException('Login com Google não está configurado neste servidor');
+    }
+
+    let payload: TokenPayload | undefined;
+    try {
+      const ticket = await this.googleClient.verifyIdToken({ idToken, audience: clientId });
+      payload = ticket.getPayload();
+    } catch {
+      throw new UnauthorizedException('Não foi possível validar sua conta Google');
+    }
+    // email_verified === true é obrigatório: sem isso, qualquer conta Google
+    // poderia assumir uma conta local de e-mail igual ainda não confirmado.
+    if (!payload?.sub || !payload.email || payload.email_verified !== true) {
+      throw new UnauthorizedException('Não foi possível validar sua conta Google');
+    }
+
+    const name = payload.name ?? payload.email.split('@')[0];
+    const user = await this.users.findOrCreateGoogleUser(payload.email, name, payload.sub);
     return this.issueTokens(user.id, user.email);
   }
 

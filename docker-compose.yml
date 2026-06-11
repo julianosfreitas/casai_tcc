@@ -49,19 +49,23 @@ services:
       JWT_SECRET: ${JWT_SECRET:?defina JWT_SECRET no .env}
       CASAI_ENCRYPTION_KEY: ${CASAI_ENCRYPTION_KEY:?defina CASAI_ENCRYPTION_KEY no .env}
       WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:3100}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       PORT: 4000
     ports:
       - '4000:4000'
 
   casai-web:
-    build: ./apps/web
+    build:
+      context: ./apps/web
+      # NEXT_PUBLIC_* é embutido no bundle em build-time (não adianta só runtime).
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000/api}
+        NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-http://localhost:4000}
+        NEXT_PUBLIC_GOOGLE_CLIENT_ID: ${NEXT_PUBLIC_GOOGLE_CLIENT_ID:-}
     container_name: casai-web
     restart: unless-stopped
     depends_on:
       - casai-api
-    environment:
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:4000/api}
-      NEXT_PUBLIC_WS_URL: ${NEXT_PUBLIC_WS_URL:-http://localhost:4000}
     ports:
       - '3100:3000'
 
