@@ -1,9 +1,10 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { LogOut, Zap, Gauge, TrendingUp } from 'lucide-react';
+import { LogOut, Zap, Gauge, TrendingUp, Plug } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ModeToggle } from '@/components/mode-toggle';
@@ -71,6 +72,12 @@ export default function DashboardPage() {
           <p className="text-sm text-muted-foreground">Sua casa, no controle</p>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" asChild>
+            <Link href="/devices">
+              <Plug className="h-4 w-4 sm:mr-1" />
+              <span className="hidden sm:inline">Dispositivos</span>
+            </Link>
+          </Button>
           <ModeToggle />
           <Button variant="outline" size="icon" onClick={logout} aria-label="Sair">
             <LogOut className="h-5 w-5" />
@@ -109,7 +116,11 @@ export default function DashboardPage() {
         {devices.data?.length === 0 && (
           <Card>
             <CardContent className="pt-5 text-sm text-muted-foreground">
-              Nenhum dispositivo ainda. Cadastre um pelo app ou rode o seed.
+              Nenhum dispositivo ainda.{' '}
+              <Link href="/devices" className="underline hover:text-foreground">
+                Cadastre o primeiro aqui
+              </Link>
+              .
             </CardContent>
           </Card>
         )}

@@ -1,4 +1,5 @@
 import type {
+  CreateDevicePayload,
   Device,
   DeviceState,
   EnergyBucket,
@@ -56,7 +57,18 @@ export const api = {
       body: JSON.stringify({ email, name, password }),
     }),
 
+  googleSignIn: (idToken: string) =>
+    request<{ accessToken: string; refreshToken: string }>('/auth/google', {
+      method: 'POST',
+      body: JSON.stringify({ idToken }),
+    }),
+
   devices: () => request<Device[]>('/devices'),
+
+  createDevice: (payload: CreateDevicePayload) =>
+    request<Device>('/devices', { method: 'POST', body: JSON.stringify(payload) }),
+
+  deleteDevice: (id: string) => request<{ ok: true }>(`/devices/${id}`, { method: 'DELETE' }),
 
   command: (id: string, command: string, extra: Record<string, unknown> = {}) =>
     request<DeviceState>(`/devices/${id}/command`, {
