@@ -156,8 +156,9 @@ export class TuyaCloudAdapter implements DeviceAdapter {
       );
     }
 
-    const rawColor = by.get(DP.COLOR);
-    if (by.get(DP.WORK_MODE) === 'colour' && isHsv(rawColor)) {
+    // colour_data_v2 volta como objeto OU string JSON (varia por device/firmware).
+    const rawColor = coerceHsv(by.get(DP.COLOR));
+    if (by.get(DP.WORK_MODE) === 'colour' && rawColor) {
       state.color = hsvToHex(rawColor);
     }
 
@@ -231,6 +232,20 @@ interface Hsv {
 
 function isHsv(v: unknown): v is Hsv {
   return typeof v === 'object' && v !== null && 'h' in v && 's' in v && 'v' in v;
+}
+
+/** colour_data_v2 chega como objeto {h,s,v} ou como string JSON. Normaliza para Hsv|null. */
+function coerceHsv(v: unknown): Hsv | null {
+  if (isHsv(v)) return v;
+  if (typeof v === 'string' && v) {
+    try {
+      const parsed: unknown = JSON.parse(v);
+      if (isHsv(parsed)) return parsed;
+    } catch {
+      return null;
+    }
+  }
+  return null;
 }
 
 /** Converte hex (#RRGGBB) para o objeto HSV que o colour_data_v2 espera. */

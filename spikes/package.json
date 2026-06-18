@@ -11,6 +11,7 @@
     "whisper": "tsx whisper-test.ts"
   },
   "dependencies": {
+    "@tuya/tuya-connector-nodejs": "^2.1.2",
     "dotenv": "^16.4.7",
     "nodejs-whisper": "^0.2.9",
     "tp-link-tapo-connect": "^2.0.15",

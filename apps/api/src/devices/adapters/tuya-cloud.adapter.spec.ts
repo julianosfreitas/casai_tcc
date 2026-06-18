@@ -150,6 +150,18 @@ describe('TuyaCloudAdapter', () => {
     expect(st.color).toBe('#ff0000');
   });
 
+  it('readState parseia colour_data_v2 quando vem como string JSON', async () => {
+    // A Tuya Cloud devolve colour_data_v2 stringificado em alguns devices (visto no spike real).
+    const m = makeClient([
+      { code: DP.POWER, value: true },
+      { code: DP.WORK_MODE, value: 'colour' },
+      { code: DP.COLOR, value: '{"h":0,"s":1000,"v":1000}' },
+    ]);
+    const a = new TuyaCloudAdapter(ctx(), { client: m.client });
+    const st = await a.readState();
+    expect(st.color).toBe('#ff0000');
+  });
+
   it('lança NotImplemented quando a capacidade não é suportada', async () => {
     const m = makeClient();
     const a = new TuyaCloudAdapter(
