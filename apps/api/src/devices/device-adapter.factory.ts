@@ -3,6 +3,7 @@ import type { Device } from '@prisma/client';
 import { CryptoService } from '../common/crypto/crypto.service';
 import { MockAdapter } from './adapters/mock.adapter';
 import { TuyaAdapter } from './adapters/tuya.adapter';
+import { TuyaCloudAdapter } from './adapters/tuya-cloud.adapter';
 import { TapoAdapter } from './adapters/tapo.adapter';
 import type { AdapterContext, DeviceAdapter } from './device-adapter.interface';
 
@@ -33,6 +34,9 @@ export class DeviceAdapterFactory {
     switch (device.protocol) {
       case 'TUYA':
         return new TuyaAdapter(ctx);
+      case 'TUYA_CLOUD':
+        // Credenciais do Cloud Project vêm do ambiente (TUYA_CLOUD_*); o device id é o externalId.
+        return new TuyaCloudAdapter(ctx);
       case 'TAPO':
         return new TapoAdapter(ctx);
       case 'MOCK':

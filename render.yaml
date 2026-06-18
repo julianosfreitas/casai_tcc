@@ -9,8 +9,12 @@ services:
     rootDir: apps/api
     buildCommand: npm ci && npx prisma generate && npm run build
     startCommand: npx prisma migrate deploy && node dist/main.js
-    healthCheckPath: /api/health
+    # health fica em /health (main.ts exclui 'health' do prefixo global /api).
+    healthCheckPath: /health
     envVars:
+      # Node 20 LTS (CLAUDE.md §2) — fixa a versão em vez do default do Render.
+      - key: NODE_VERSION
+        value: '20'
       - key: DATABASE_URL
         fromDatabase:
           name: casai-db

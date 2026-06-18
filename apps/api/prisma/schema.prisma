@@ -18,6 +18,7 @@ datasource db {
 
 enum Protocol {
   TUYA
+  TUYA_CLOUD // controle via Tuya Cloud Open API (aditivo ao TUYA local; valida sem hardware físico)
   TAPO
   MOCK
   ZIGBEE // fase futura — declarado para a factory/migração não quebrar depois
