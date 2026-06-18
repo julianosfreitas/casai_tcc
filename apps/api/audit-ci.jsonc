@@ -8,6 +8,13 @@
     // tp-link-tapo-connect (ip → get-ip-range → local-devices). Sem correção
     // upstream; `local-devices` é usado só para descoberta de IP na LAN. Risco
     // aceito no contexto local-first do CASAI. Revisar a cada bump da lib IoT.
-    "GHSA-2p57-rm9w-gvfp"
+    "GHSA-2p57-rm9w-gvfp",
+    // GHSA-72gw-mp4g-v24j — DoS no `multer` via nomes de campo multipart
+    // profundamente aninhados, transitivo de @nestjs/platform-express. O fix
+    // (multer 2.x) é breaking e quebraria o FileInterceptor do Nest 11. O único
+    // endpoint multipart do CASAI é /voice/transcribe (um único campo de áudio,
+    // recurso opcional). Risco de DoS aceito no contexto de demo local-first.
+    // Revisar quando o @nestjs/platform-express adotar multer 2.x.
+    "GHSA-72gw-mp4g-v24j"
   ]
 }
