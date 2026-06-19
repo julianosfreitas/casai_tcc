@@ -47,7 +47,7 @@ export interface DiscoveredDevice {
   vendor?: string;
   /** Palpite de protocolo a partir da porta aberta / fabricante. */
   protocolGuess: 'TUYA' | 'TAPO' | null;
-  /** Portas TCP abertas relevantes (80, 6668, 9999). */
+  /** Portas TCP abertas relevantes (80, 443, 6668, 9999). */
   openPorts: number[];
   /** Tuya: device id descoberto no broadcast (preenche o cadastro). */
   externalId?: string;
@@ -67,7 +67,8 @@ interface TuyaBroadcast {
 @Injectable()
 export class NetworkScannerService {
   private readonly logger = new Logger(NetworkScannerService.name);
-  private static readonly PROBE_PORTS = [80, 6668, 9999];
+  // 80/443 = Tapo KLAP (firmware moderno); 6668 = Tuya local; 9999 = Tapo/Kasa legado.
+  private static readonly PROBE_PORTS = [80, 443, 6668, 9999];
 
   /**
    * Descoberta combinada: escuta broadcast Tuya (passivo) + varre a sub-rede
@@ -77,11 +78,14 @@ export class NetworkScannerService {
    */
   async discover(durationMs = 6000): Promise<{ devices: DiscoveredDevice[]; hint: string }> {
     const subnet = this.localSubnet();
-    const [broadcasts, openByIp, arp] = await Promise.all([
+    // Broadcast + scan TCP em paralelo. O scanTcp "aquece" a tabela ARP (abre conexões
+    // TCP nos hosts), então lemos o ARP DEPOIS — assim o enriquecimento por fabricante
+    // (OUI) enxerga os IPs recém-sondados em vez de uma tabela fria.
+    const [broadcasts, openByIp] = await Promise.all([
       this.listenTuyaBroadcast(durationMs),
       subnet ? this.scanTcp(subnet) : Promise.resolve(new Map<string, number[]>()),
-      this.readArpVendors(),
     ]);
+    const arp = await this.readArpVendors();
 
     const byIp = new Map<string, DiscoveredDevice>();
     const ensure = (ip: string): DiscoveredDevice => {
@@ -133,7 +137,7 @@ export class NetworkScannerService {
 
     const hint = devices.length
       ? 'Tuya: ainda é preciso a local_key para controlar (ver HARDWARE_SETUP.md). Tapo: informe e-mail/senha da conta TP-Link.'
-      : 'Nenhum dispositivo de automação detectado. Verifique se estão ligados, na MESMA rede/banda 2.4GHz, e se o firewall não bloqueia UDP 6666/6667.';
+      : 'Nenhum dispositivo de automação detectado. Verifique se estão ligados e na MESMA rede Wi-Fi 2.4GHz. Tomadas Tapo com firmware novo (KLAP) podem não aparecer na busca — cadastre manualmente pelo IP (app Tapo → dispositivo → Informações).';
     return { devices, hint };
   }
 
@@ -241,12 +245,18 @@ export class NetworkScannerService {
     const out = new Map<string, { mac: string; vendor: string; guess: 'TUYA' | 'TAPO' | null }>();
     try {
       const { stdout } = await execAsync('arp -a');
-      const re =
-        /(\d+\.\d+\.\d+\.\d+)\s+([0-9a-fA-F]{2}[:-][0-9a-fA-F]{2}[:-][0-9a-fA-F]{2}[:-][0-9a-fA-F]{2}[:-][0-9a-fA-F]{2}[:-][0-9a-fA-F]{2})/g;
+      // Formato `host (IP) at MAC ...` em macOS e Linux. O macOS imprime octetos SEM
+      // zero à esquerda (ex.: 58:2:5b:aa:b:cc) — aceitamos 1-2 hex por octeto e
+      // normalizamos com padStart, senão o OUI sai deslocado/errado.
+      const re = /(\d+\.\d+\.\d+\.\d+)\)?\s+at\s+([0-9a-fA-F]{1,2}(?:[:-][0-9a-fA-F]{1,2}){5})\b/gi;
       let m: RegExpExecArray | null;
       while ((m = re.exec(stdout)) !== null) {
         const ip = m[1];
-        const mac = m[2].replace(/-/g, ':').toLowerCase();
+        const mac = m[2]
+          .split(/[:-]/)
+          .map((o) => o.padStart(2, '0'))
+          .join(':')
+          .toLowerCase();
         const oui = mac.replace(/:/g, '').slice(0, 6);
         const vendor = OUI_VENDORS[oui];
         out.set(ip, {
@@ -254,6 +264,11 @@ export class NetworkScannerService {
           vendor: vendor?.vendor ?? 'Desconhecido',
           guess: vendor?.guess ?? null,
         });
+      }
+      if (out.size === 0) {
+        this.logger.warn(
+          'ARP não retornou dispositivos legíveis; enriquecimento por fabricante (OUI) indisponível nesta plataforma.',
+        );
       }
     } catch (e) {
       this.logger.debug(`arp: ${String(e)}`);

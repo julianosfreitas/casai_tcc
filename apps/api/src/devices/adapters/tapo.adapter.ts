@@ -22,6 +22,11 @@ interface TapoEnergyRaw {
   month_energy?: number;
 }
 
+// A lib tp-link-tapo-connect usa axios SEM timeout. Um P110 desligado-mas-roteável
+// travaria a chamada até o timeout TCP do SO (30-75s), bloqueando a fila serializada
+// do dispositivo. Limitamos cada chamada de rede a 5s e caímos em DeviceOfflineError.
+const CONNECT_TIMEOUT_MS = 5000;
+
 export class TapoAdapter implements DeviceAdapter {
   private readonly logger = new Logger(TapoAdapter.name);
   private session: TapoSession | null = null;
@@ -53,8 +58,12 @@ export class TapoAdapter implements DeviceAdapter {
   }
 
   async toggle(): Promise<void> {
-    const state = await this.readState();
-    await this.run((s) => (state.on ? s.turnOff() : s.turnOn()));
+    // Lê e escreve dentro de UM único run() — uma sessão, um retry coerente
+    // (evita re-login duplo se a sessão expirar entre o read e o write).
+    await this.run(async (s) => {
+      const info = await s.getDeviceInfo();
+      return info.device_on ? s.turnOff() : s.turnOn();
+    });
   }
 
   async setBrightness(value: number): Promise<void> {
@@ -87,23 +96,29 @@ export class TapoAdapter implements DeviceAdapter {
       return null;
     }
     const raw = (await this.run((s) => s.getEnergyUsage())) as unknown as TapoEnergyRaw;
+    // Sem potência válida: leitura não-confiável. Retorna null (o poller pula) em vez
+    // de gravar 0 W falso, que distorceria as médias do dashboard de energia.
+    if (raw.current_power === undefined) {
+      return null;
+    }
     return {
-      watts: (raw.current_power ?? 0) / 1000, // mW → W
+      watts: raw.current_power / 1000, // mW → W
       kwhToday: raw.today_energy !== undefined ? raw.today_energy / 1000 : undefined, // Wh → kWh
       kwhMonth: raw.month_energy !== undefined ? raw.month_energy / 1000 : undefined,
     };
   }
 
   // Executa uma operação com re-login automático em caso de sessão expirada.
+  // Cada chamada de rede é limitada por withTimeout (a lib não tem timeout próprio).
   private async run<T>(op: (s: TapoSession) => Promise<T>): Promise<T> {
     const session = this.session ?? (await this.login());
     try {
-      return await op(session);
+      return await this.withTimeout(op(session), 'op');
     } catch (err) {
       this.logger.debug(`Tapo ${this.ctx.name}: re-login após erro (${(err as Error).message})`);
       const fresh = await this.login();
       try {
-        return await op(fresh);
+        return await this.withTimeout(op(fresh), 'op');
       } catch (retryErr) {
         throw new DeviceOfflineError(this.ctx.deviceId, retryErr);
       }
@@ -112,10 +127,23 @@ export class TapoAdapter implements DeviceAdapter {
 
   private async login(): Promise<TapoSession> {
     try {
-      this.session = await loginDeviceByIp(this.ctx.tapoEmail!, this.ctx.tapoPass!, this.ctx.ip!);
+      this.session = await this.withTimeout(
+        loginDeviceByIp(this.ctx.tapoEmail!, this.ctx.tapoPass!, this.ctx.ip!),
+        'login',
+      );
       return this.session;
     } catch (err) {
       throw new DeviceOfflineError(this.ctx.deviceId, err);
     }
+  }
+
+  // Limita uma promessa de rede a CONNECT_TIMEOUT_MS — espelha o TuyaAdapter local.
+  private withTimeout<T>(promise: Promise<T>, op: string): Promise<T> {
+    return Promise.race([
+      promise,
+      new Promise<T>((_, reject) =>
+        setTimeout(() => reject(new Error(`timeout em ${op}`)), CONNECT_TIMEOUT_MS),
+      ),
+    ]);
   }
 }

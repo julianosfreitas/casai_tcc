@@ -36,6 +36,12 @@ export class DevicesController {
     return this.devices.get(user.id, id);
   }
 
+  // Leitura de estado SEM mutar (usada pelo "Testar conexão") — não liga/desliga.
+  @Get(':id/state')
+  state(@CurrentUser() user: AuthUser, @Param('id') id: string) {
+    return this.devices.getState(user.id, id);
+  }
+
   @Post()
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateDeviceDto) {
     return this.devices.create(user.id, dto);

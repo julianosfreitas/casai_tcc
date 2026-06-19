@@ -8,9 +8,10 @@
 // primeiro para confirmar e, se preciso, ajustar estes nomes):
 //   switch_led(bool) · bright_value_v2(10..1000) · temp_value_v2(0..1000) ·
 //   colour_data_v2({h:0..360,s:0..1000,v:0..1000}) · work_mode("white"|"colour")
-import { Logger, NotImplementedException } from '@nestjs/common';
+import { Logger, NotImplementedException, ServiceUnavailableException } from '@nestjs/common';
 import { TuyaContext } from '@tuya/tuya-connector-nodejs';
 import {
+  DeviceCommandError,
   DeviceOfflineError,
   type AdapterContext,
   type DeviceAdapter,
@@ -104,7 +105,8 @@ export class TuyaCloudAdapter implements DeviceAdapter {
     if (!this.ctx.supportsBrightness) {
       throw new NotImplementedException('Dispositivo não suporta brilho');
     }
-    // 0-100 (CASAI) -> 10-1000 (Tuya).
+    // 0-100 (CASAI) -> 10-1000 (Tuya). O piso 10 do bright_value_v2 é o mínimo aceso:
+    // brilho 0 NÃO apaga, deixa no mínimo. Para realmente apagar, use turnOff().
     const pct = Math.max(0, Math.min(100, value));
     const scaled = Math.round(TUYA_BRIGHT_MIN + (pct / 100) * (TUYA_SCALE_MAX - TUYA_BRIGHT_MIN));
     await this.sendCommands([{ code: DP.BRIGHTNESS, value: scaled }]);
@@ -129,6 +131,9 @@ export class TuyaCloudAdapter implements DeviceAdapter {
     if (!this.ctx.supportsColor) {
       throw new NotImplementedException('Dispositivo não suporta cor');
     }
+    // Entra em modo colour; NÃO restauramos o work_mode anterior (corte MVP). Um
+    // setBrightness seguinte em modo colour ajusta o "v" do HSV via bright_value_v2 —
+    // comportamento do device, aceito para o demo.
     await this.sendCommands([
       { code: DP.WORK_MODE, value: 'colour' },
       { code: DP.COLOR, value: hexToHsv(hex) },
@@ -142,15 +147,17 @@ export class TuyaCloudAdapter implements DeviceAdapter {
     const on = Boolean(by.get(DP.POWER));
     const state: DeviceState = { on };
 
-    const rawBright = Number(by.get(DP.BRIGHTNESS) ?? 0);
-    if (rawBright) {
+    if (by.has(DP.BRIGHTNESS)) {
+      const rawBright = Number(by.get(DP.BRIGHTNESS) ?? 0);
       state.brightness = Math.round(
         ((rawBright - TUYA_BRIGHT_MIN) / (TUYA_SCALE_MAX - TUYA_BRIGHT_MIN)) * 100,
       );
     }
 
+    // temp_value_v2 obsoleto persiste mesmo em modo cor — só reportamos colorTemp
+    // fora do modo colour, espelhando o gate do ramo de cor abaixo (estado coerente).
     const rawTemp = by.get(DP.COLOR_TEMP);
-    if (rawTemp != null) {
+    if (by.get(DP.WORK_MODE) !== 'colour' && rawTemp != null) {
       state.colorTemp = Math.round(
         KELVIN_MIN + (Number(rawTemp) / TUYA_SCALE_MAX) * (KELVIN_MAX - KELVIN_MIN),
       );
@@ -192,7 +199,10 @@ export class TuyaCloudAdapter implements DeviceAdapter {
     if (!payload || payload.success !== true) {
       const msg = payload?.msg ?? `code ${payload?.code ?? '?'}`;
       this.logger.warn(`Tuya Cloud ${this.ctx.name}: ${method} ${path} falhou: ${msg}`);
-      throw new DeviceOfflineError(this.ctx.deviceId, new Error(String(msg)));
+      // A API RESPONDEU e rejeitou (permissão/token/rate-limit/DP inválido) — NÃO é
+      // "offline". Distinguimos do erro de transporte (catch acima) para não marcar
+      // OFFLINE uma lâmpada que está online e só recusou o comando.
+      throw new DeviceCommandError(this.ctx.deviceId, String(msg));
     }
     return payload;
   }
@@ -217,8 +227,10 @@ function configFromEnv(): TuyaCloudConfig {
   const accessId = process.env.TUYA_CLOUD_ACCESS_ID;
   const accessSecret = process.env.TUYA_CLOUD_ACCESS_SECRET;
   if (!baseUrl || !accessId || !accessSecret) {
-    throw new Error(
-      'TuyaCloudAdapter exige TUYA_CLOUD_BASE_URL, TUYA_CLOUD_ACCESS_ID e TUYA_CLOUD_ACCESS_SECRET no ambiente',
+    // Exceção Nest (não Error cru): vira 503 localizado pelo filtro global, em vez
+    // de 500 técnico — o construtor roda fora do try/catch de executeCommand.
+    throw new ServiceUnavailableException(
+      'Controle via nuvem indisponível: configure TUYA_CLOUD_BASE_URL, TUYA_CLOUD_ACCESS_ID e TUYA_CLOUD_ACCESS_SECRET no servidor.',
     );
   }
   return { baseUrl, accessId, accessSecret };
@@ -231,7 +243,11 @@ interface Hsv {
 }
 
 function isHsv(v: unknown): v is Hsv {
-  return typeof v === 'object' && v !== null && 'h' in v && 's' in v && 'v' in v;
+  if (typeof v !== 'object' || v === null) return false;
+  const o = v as Record<string, unknown>;
+  // Valida que h/s/v são numéricos — payload malformado cai em null (cor omitida)
+  // em vez de gerar hex-NaN.
+  return typeof o.h === 'number' && typeof o.s === 'number' && typeof o.v === 'number';
 }
 
 /** colour_data_v2 chega como objeto {h,s,v} ou como string JSON. Normaliza para Hsv|null. */

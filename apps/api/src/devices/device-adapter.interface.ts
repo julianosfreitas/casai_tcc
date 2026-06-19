@@ -43,6 +43,20 @@ export class DeviceOfflineError extends Error {
   }
 }
 
+/**
+ * Lançada quando o dispositivo RESPONDEU mas rejeitou o comando (DP/credencial
+ * inválida, permissão, rate-limit). NÃO é "offline" — não deve marcar OFFLINE.
+ */
+export class DeviceCommandError extends Error {
+  constructor(
+    public readonly deviceId: string,
+    public readonly detail?: string,
+  ) {
+    super(`Dispositivo ${deviceId} rejeitou o comando${detail ? `: ${detail}` : ''}`);
+    this.name = 'DeviceCommandError';
+  }
+}
+
 /** Dados (descriptografados em memória) que um adapter precisa para conectar. */
 export interface AdapterContext {
   deviceId: string;

@@ -13,6 +13,7 @@ import { DeviceCommandQueue } from './device-command.queue';
 import { DeviceEvents } from './device-events';
 import { NetworkScannerService } from './discovery/network-scanner.service';
 import {
+  DeviceCommandError,
   DeviceOfflineError,
   type DeviceAdapter,
   type DeviceState,
@@ -142,28 +143,35 @@ export class DevicesService {
       try {
         await adapter.connect();
         await this.applyCommand(adapter, dto);
-        const state = await adapter.readState();
-        await this.prisma.device.update({
-          where: { id: device.id },
-          data: {
-            lastState: state as unknown as Prisma.InputJsonValue,
-            lastSeen: new Date(),
-            status: 'ONLINE',
-          },
-        });
-        this.events.emitStatusChanged(userId, device.id, state, 'ONLINE');
+        // A Tuya Cloud é eventualmente consistente: a leitura imediata pós-comando
+        // volta o estado ANTERIOR. Sobrepomos a intenção do comando nos campos que
+        // ele tocou, para o app refletir a ação na hora. Adapters locais/MOCK já
+        // leem fresco → overlay é praticamente no-op.
+        const read = await adapter.readState();
+        const state = this.overlayExpectedState(read, dto);
+        await this.persistOnline(userId, device.id, state);
         return state;
       } catch (err) {
-        if (err instanceof DeviceOfflineError) {
-          this.invalidateAdapter(device.id);
-          await this.prisma.device.update({
-            where: { id: device.id },
-            data: { status: 'OFFLINE' },
-          });
-          this.events.emitOffline(userId, device.id);
-          throw new ServiceUnavailableException('Dispositivo offline ou inacessível');
-        }
-        throw err;
+        return this.handleControlError(userId, device.id, err);
+      }
+    });
+  }
+
+  /**
+   * Leitura de estado SEM mutação (usada pelo "Testar conexão" do app). Atualiza
+   * ONLINE/OFFLINE e faz broadcast, mas NÃO liga/desliga o dispositivo.
+   */
+  async getState(userId: string, id: string): Promise<DeviceState> {
+    const device = await this.findEntity(userId, id);
+    const adapter = this.getAdapter(device);
+    return this.queue.enqueue(device.id, async () => {
+      try {
+        await adapter.connect();
+        const state = await adapter.readState();
+        await this.persistOnline(userId, device.id, state);
+        return state;
+      } catch (err) {
+        return this.handleControlError(userId, device.id, err);
       }
     });
   }
@@ -240,6 +248,65 @@ export class DevicesService {
         .disconnect()
         .catch((e: unknown) => this.logger.debug(`disconnect: ${String(e)}`));
       this.adapters.delete(id);
+    }
+  }
+
+  /**
+   * Persiste estado/última-vez-visto/ONLINE e faz broadcast. Se o update no banco
+   * falhar, o comando físico JÁ surtiu efeito — logamos e ainda emitimos/retornamos
+   * o estado, em vez de transformar uma ação bem-sucedida em erro 500.
+   */
+  private async persistOnline(userId: string, id: string, state: DeviceState): Promise<void> {
+    try {
+      await this.prisma.device.update({
+        where: { id },
+        data: {
+          lastState: state as unknown as Prisma.InputJsonValue,
+          lastSeen: new Date(),
+          status: 'ONLINE',
+        },
+      });
+    } catch (e: unknown) {
+      this.logger.warn(`Estado de ${id} não persistido (comando já aplicado): ${String(e)}`);
+    }
+    this.events.emitStatusChanged(userId, id, state, 'ONLINE');
+  }
+
+  /** Trata erro de controle/leitura: offline → 503; comando rejeitado → 422. */
+  private async handleControlError(userId: string, id: string, err: unknown): Promise<never> {
+    if (err instanceof DeviceOfflineError) {
+      this.invalidateAdapter(id);
+      await this.prisma.device.update({ where: { id }, data: { status: 'OFFLINE' } });
+      this.events.emitOffline(userId, id);
+      throw new ServiceUnavailableException('Dispositivo offline ou inacessível');
+    }
+    if (err instanceof DeviceCommandError) {
+      // Dispositivo ONLINE que recusou o comando (DP/credencial/permissão) — não offline.
+      throw new UnprocessableEntityException('O dispositivo rejeitou o comando');
+    }
+    throw err;
+  }
+
+  /**
+   * Sobrepõe a intenção do comando sobre o estado lido — mascara o atraso de
+   * propagação da Tuya Cloud (eventual consistency). Só toca os campos do comando.
+   */
+  private overlayExpectedState(read: DeviceState, dto: DeviceCommandDto): DeviceState {
+    switch (dto.command) {
+      case 'turnOn':
+        return { ...read, on: true };
+      case 'turnOff':
+        return { ...read, on: false };
+      case 'setBrightness':
+        return dto.brightness === undefined
+          ? read
+          : { ...read, on: true, brightness: dto.brightness };
+      case 'setColor':
+        return dto.color ? { ...read, on: true, color: dto.color } : read;
+      case 'setColorTemp':
+        return dto.colorTemp === undefined ? read : { ...read, on: true, colorTemp: dto.colorTemp };
+      case 'toggle':
+        return read; // sem valor-alvo no DTO; confia na leitura
     }
   }
 

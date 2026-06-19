@@ -6,7 +6,11 @@ import {
   hsvToHex,
   type TuyaCloudClient,
 } from './tuya-cloud.adapter';
-import { DeviceOfflineError, type AdapterContext } from '../device-adapter.interface';
+import {
+  DeviceCommandError,
+  DeviceOfflineError,
+  type AdapterContext,
+} from '../device-adapter.interface';
 
 type StatusItem = { code: string; value: unknown };
 interface RequestOpts {
@@ -162,6 +166,30 @@ describe('TuyaCloudAdapter', () => {
     expect(st.color).toBe('#ff0000');
   });
 
+  it('readState NÃO reporta colorTemp em modo colour (temp_value_v2 obsoleto)', async () => {
+    const m = makeClient([
+      { code: DP.POWER, value: true },
+      { code: DP.WORK_MODE, value: 'colour' },
+      { code: DP.COLOR_TEMP, value: 342 }, // valor antigo persiste mas não vale em colour
+      { code: DP.COLOR, value: { h: 0, s: 1000, v: 1000 } },
+    ]);
+    const a = new TuyaCloudAdapter(ctx(), { client: m.client });
+    const st = await a.readState();
+    expect(st.colorTemp).toBeUndefined();
+    expect(st.color).toBe('#ff0000');
+  });
+
+  it('readState ignora colour_data_v2 com campos não-numéricos (sem hex-NaN)', async () => {
+    const m = makeClient([
+      { code: DP.POWER, value: true },
+      { code: DP.WORK_MODE, value: 'colour' },
+      { code: DP.COLOR, value: { h: 'x', s: 1000, v: 1000 } },
+    ]);
+    const a = new TuyaCloudAdapter(ctx(), { client: m.client });
+    const st = await a.readState();
+    expect(st.color).toBeUndefined();
+  });
+
   it('lança NotImplemented quando a capacidade não é suportada', async () => {
     const m = makeClient();
     const a = new TuyaCloudAdapter(
@@ -175,10 +203,11 @@ describe('TuyaCloudAdapter', () => {
     await expect(a.setBrightness(50)).rejects.toBeInstanceOf(NotImplementedException);
   });
 
-  it('lança DeviceOfflineError quando a API responde success=false', async () => {
+  it('lança DeviceCommandError quando a API responde success=false (online, recusou)', async () => {
+    // success=false = dispositivo respondeu e rejeitou — NÃO é offline.
     const m = makeClient([], { success: false });
     const a = new TuyaCloudAdapter(ctx(), { client: m.client });
-    await expect(a.turnOn()).rejects.toBeInstanceOf(DeviceOfflineError);
+    await expect(a.turnOn()).rejects.toBeInstanceOf(DeviceCommandError);
   });
 
   it('lança DeviceOfflineError quando o conector rejeita (rede)', async () => {
