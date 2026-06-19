@@ -17,6 +17,38 @@ menos de **R$ 200** em hardware, sem nuvem nem conhecimento técnico.
 > a demo do TCC. **Não existe "API Intelbras" separada** (ADR-001): a linha Izy é
 > Tuya white-label, coberta pelo mesmo `tuyapi`.
 
+## 📍 Status atual — onde paramos (19/06/2026)
+
+**✅ Pronto e verde:** app completo (login/Google/demo, dispositivos, rotinas, cenas,
+voz, energia, gamificação, PWA, tempo real) · **Tapo P110 controlado LOCAL de verdade**
+(KLAP) · Tuya Cloud provado 8/8 contra device virtual · CI verde (cobertura ~80%) ·
+deploy Render + Vercel.
+
+**🟡 Em andamento — controle FÍSICO da lâmpada Intelbras EWS 410:**
+
+| Item | Estado |
+|------|--------|
+| Hardware confirmado | **Wi-Fi 2,4 GHz + Tuya** (não Zigbee), RGBCW E27, Kelvin 3000–6500K — fontes oficiais. Ver [docs/EWS410-integracao.md](docs/EWS410-integracao.md). |
+| Via escolhida | **Controle LOCAL na LAN via `tuyapi`** (adapter `TUYA` já existe). Cloud/HA = fallback. |
+| **GARGALO atual** | A lâmpada **não está no projeto Tuya** (só o device virtual) nem na LAN. Falta **provisionar**: parear no **SmartLife** (não Izy) → **Link App Account** no projeto `casai`. Bloqueio no link: *"upper limit of 2 projects"* → **desvincular a conta SmartLife de 1 projeto antigo** em iot.tuya.com (cada projeto → Devices → Link Tuya App Account → Unlink). |
+| Motor pronto | [`spikes/ews410-bootstrap.cjs`](spikes/ews410-bootstrap.cjs) — assim que a lâmpada parear+linkar, faz tudo: pega device_id+local_key da nuvem, lê `/specification` (v1 vs v2 + Kelvin), acha IP+protocolo na LAN, e **controla local** (dump DPS real + on/off/brilho/temp/cor). |
+
+**▶️ Como retomar (na ordem):**
+1. No celular: SmartLife → reset da lâmpada (liga/desliga interruptor **5× ~2s** → pisca rápido) → Add Device na Wi-Fi **2,4 GHz**.
+2. iot.tuya.com → liberar 1 slot (Unlink de projeto antigo) → projeto `casai` → **Link Tuya App Account** (QR).
+3. Confirmar a lâmpada em **Devices → All Devices** (Online).
+4. Rodar: `node spikes/ews410-bootstrap.cjs` → ele imprime os **DPS reais**.
+5. Ajustar o adapter com base no dump (ver pendências abaixo) e cadastrar o device (`protocol='TUYA'`).
+
+**🔧 Pendências de código (aplicar APÓS o dump real da lâmpada):**
+- **Resolver contradição de DPS:** `apps/api/src/devices/adapters/tuya.adapter.ts:16` usa `POWER:20` (esquema v2) mas `spikes/tuya-test.ts` **assume** `POWER:1` (v1) — **nenhum verificado em hardware**. Só `get({schema:true})` decide.
+- Tornar escala brilho/temp **configurável** (v1 0–255 vs v2 0–1000) em vez de hardcoded.
+- Calibrar Kelvin: piso **2700→3000K** (hardware é 3000–6500K).
+- Escrever `work_mode='colour'` no caminho LAN se a cor não "pegar".
+
+**📝 WIP não commitado (do dono, preservado no working tree — NÃO subido):** tela de
+sign-up (`apps/web/src/app/login/page.tsx`, `components/ui/sign-up.tsx`, `package.json`).
+
 ```
 casai/
 ├── apps/
