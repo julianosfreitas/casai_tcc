@@ -18,6 +18,9 @@ export abstract class DeviceEvents {
   abstract emitOffline(userId: string, deviceId: string): void;
   abstract emitEnergyReading(userId: string, deviceId: string, watts: number, readAt: Date): void;
   abstract emitAutomationTriggered(userId: string, automationId: string, name: string): void;
+  // Cadastro/remoção de dispositivo — para a lista atualizar em tempo real (sem reload).
+  abstract emitDeviceCreated(userId: string, deviceId: string): void;
+  abstract emitDeviceRemoved(userId: string, deviceId: string): void;
 }
 
 @Injectable()
@@ -26,4 +29,6 @@ export class NoopDeviceEvents extends DeviceEvents {
   emitOffline(): void {}
   emitEnergyReading(): void {}
   emitAutomationTriggered(): void {}
+  emitDeviceCreated(): void {}
+  emitDeviceRemoved(): void {}
 }

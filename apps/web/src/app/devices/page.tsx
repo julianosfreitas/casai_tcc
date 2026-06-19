@@ -7,10 +7,12 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { AppShell } from '@/components/app-shell';
 import { api } from '@/lib/api';
+import { useDeviceSync } from '@/lib/use-device-sync';
 import { DeviceRow } from './_shared';
 
 export default function DevicesPage() {
   const qc = useQueryClient();
+  useDeviceSync(); // novos dispositivos / mudanças aparecem em tempo real
   const devices = useQuery({ queryKey: ['devices'], queryFn: api.devices });
 
   const remove = useMutation({
