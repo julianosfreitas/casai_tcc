@@ -20,6 +20,7 @@ enum Protocol {
   TUYA
   TUYA_CLOUD // controle via Tuya Cloud Open API (aditivo ao TUYA local; valida sem hardware físico)
   TAPO
+  HOME_ASSISTANT // controla entidades de uma instância Home Assistant existente (REST API + token); CASAI continua o núcleo (ADR-001)
   MOCK
   ZIGBEE // fase futura — declarado para a factory/migração não quebrar depois
 }

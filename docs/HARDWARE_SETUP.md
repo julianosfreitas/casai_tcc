@@ -96,6 +96,58 @@ TAPO_EMAIL=voce@email.com TAPO_PASS=suasenha TAPO_IP=192.168.1.y \
   teste com uma senha simples temporária.
 - O P110 retorna energia em campos `current_power` (W), `today_energy` e
   `month_energy` — **confirme se a unidade é Wh ou kWh** antes de calcular R$.
+- A lib pode imprimir `console.warn("Failed to login... Falling back to legacy login method")`
+  quando o login KLAP falha e ela cai no protocolo legado. **É benigno**: ela sempre
+  tenta KLAP primeiro; no firmware KLAP recente do P110 o login funciona de primeira e
+  o aviso nem aparece. O `error` impresso é de transporte/HTTP — **nunca** a senha. Não
+  desabilite o fallback. Como a lib escreve fora do `Logger` do Nest, o adapter não
+  intercepta o aviso (interceptar exigiria fork/monkey-patch — fora de escopo); o
+  logging do próprio `TapoAdapter` é limpo e nunca registra e-mail/senha.
+- No CASAI, a busca automática de dispositivos sonda as portas 80/443 (Tapo KLAP) além
+  de 6668 (Tuya) e 9999 (legado), mas uma P110 nova pode não aparecer — nesse caso
+  cadastre manualmente pelo IP. O controle independe da busca (usa `loginDeviceByIp`).
+
+---
+
+## Parte 2B — Home Assistant (adapter `HOME_ASSISTANT`)
+
+Caminho **aditivo**: o CASAI controla uma entidade de uma instância **Home Assistant
+existente** via REST API. O CASAI continua o núcleo (ADR-001) — o HA é só mais uma
+fonte atrás do adapter pattern. Útil para reaproveitar dispositivos que o usuário já
+pareou no HA (o HA continua responsável pelo pareamento; ver
+`RELATED_WORK_Home_Assistant.md`).
+
+### 2B.1 Pré-requisitos
+- Uma instância HA acessível na rede (ex.: `http://homeassistant.local:8123`), com o
+  dispositivo já adicionado nela.
+- Um **Long-Lived Access Token**: HA → seu perfil → "Long-Lived Access Tokens" →
+  *Create Token*. Guarde — não aparece de novo.
+
+### 2B.2 Configurar no servidor (`.env` da API)
+```
+HOME_ASSISTANT_BASE_URL=http://homeassistant.local:8123
+HOME_ASSISTANT_TOKEN=<long-lived access token>
+```
+No app, cadastre o dispositivo com protocolo **Home Assistant** e informe só o
+`entity_id` (ex.: `light.sala`) — descoberto em HA → **Ferramentas do Desenvolvedor →
+Estados**. Sem IP, sem local_key.
+
+### 2B.3 Validar (use o spike)
+```
+HOME_ASSISTANT_BASE_URL=... HOME_ASSISTANT_TOKEN=... HOME_ASSISTANT_ENTITY_ID=light.sala \
+  npm --prefix spikes run ha
+```
+Liga, ajusta brilho/cor (se for `light.`) e desliga, lendo o estado de volta.
+
+### ⚠️ Armadilhas conhecidas
+- O **token** é segredo: fica no `.env` do servidor, nunca no código nem commitado, e
+  nunca é logado pelo adapter.
+- `entity_id` errado → a API do HA responde **404** → o CASAI marca *comando rejeitado*
+  (não "offline"). Confira em Ferramentas do Desenvolvedor → Estados.
+- Energia (W/kWh) no HA é uma **entidade de sensor separada**, não atributo da
+  luz/tomada — por isso `readEnergy()` retorna `null` neste adapter (fora de escopo).
+- `color_temp_kelvin` exige HA recente (2022.11+); versões antigas usavam `color_temp`
+  em mireds.
 
 ---
 

@@ -5,6 +5,7 @@ import { MockAdapter } from './adapters/mock.adapter';
 import { TuyaAdapter } from './adapters/tuya.adapter';
 import { TuyaCloudAdapter } from './adapters/tuya-cloud.adapter';
 import { TapoAdapter } from './adapters/tapo.adapter';
+import { HomeAssistantAdapter } from './adapters/home-assistant.adapter';
 import type { AdapterContext, DeviceAdapter } from './device-adapter.interface';
 
 /**
@@ -39,6 +40,9 @@ export class DeviceAdapterFactory {
         return new TuyaCloudAdapter(ctx);
       case 'TAPO':
         return new TapoAdapter(ctx);
+      case 'HOME_ASSISTANT':
+        // Token + URL da instância HA vêm do ambiente (HOME_ASSISTANT_*); o entity_id é o externalId.
+        return new HomeAssistantAdapter(ctx);
       case 'MOCK':
         return new MockAdapter(ctx);
       case 'ZIGBEE':

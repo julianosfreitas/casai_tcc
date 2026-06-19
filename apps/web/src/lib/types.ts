@@ -1,6 +1,6 @@
 export type DeviceType = 'LIGHT' | 'PLUG' | 'SWITCH' | 'SENSOR' | 'OTHER';
 export type DeviceStatus = 'ONLINE' | 'OFFLINE' | 'UNKNOWN';
-export type Protocol = 'TUYA' | 'TAPO' | 'MOCK';
+export type Protocol = 'TUYA' | 'TUYA_CLOUD' | 'TAPO' | 'HOME_ASSISTANT' | 'MOCK';
 
 export interface DeviceState {
   on: boolean;

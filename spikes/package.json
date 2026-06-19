@@ -7,6 +7,7 @@
   "scripts": {
     "tuya": "tsx tuya-test.ts",
     "tuya:cloud": "tsx tuya-cloud-test.ts",
+    "ha": "tsx home-assistant-test.ts",
     "tapo": "tsx tapo-test.ts",
     "whisper": "tsx whisper-test.ts"
   },

@@ -84,6 +84,9 @@ export const api = {
       body: JSON.stringify({ command, ...extra }),
     }),
 
+  // Leitura de estado SEM ligar/desligar — usada pelo "Testar conexão".
+  testConnection: (id: string) => request<DeviceState>(`/devices/${id}/state`),
+
   automations: () => request<Automation[]>('/automations'),
 
   createAutomation: (payload: {
