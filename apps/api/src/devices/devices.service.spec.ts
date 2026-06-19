@@ -39,6 +39,8 @@ describe('DevicesService', () => {
     emitOffline: jest.Mock;
     emitEnergyReading: jest.Mock;
     emitAutomationTriggered: jest.Mock;
+    emitDeviceCreated: jest.Mock;
+    emitDeviceRemoved: jest.Mock;
   };
   let service: DevicesService;
   let scanner: { discover: jest.Mock };
@@ -61,6 +63,8 @@ describe('DevicesService', () => {
       emitOffline: jest.fn(),
       emitEnergyReading: jest.fn(),
       emitAutomationTriggered: jest.fn(),
+      emitDeviceCreated: jest.fn(),
+      emitDeviceRemoved: jest.fn(),
     };
     scanner = { discover: jest.fn() };
     service = new DevicesService(
@@ -103,6 +107,15 @@ describe('DevicesService', () => {
     expect(arg.data.localKeyEnc).toBe('enc(segredo123)');
     // garante que o texto puro NÃO foi persistido
     expect(JSON.stringify(arg.data)).not.toContain('"segredo123"');
+    // emite device:created para a lista reconhecer o novo dispositivo em tempo real
+    expect(events.emitDeviceCreated).toHaveBeenCalledWith('u1', 'd1');
+  });
+
+  it('remove emite device:removed para a lista atualizar em tempo real', async () => {
+    prisma.device.count.mockResolvedValue(1);
+    await service.remove('u1', 'd1');
+    expect(prisma.device.delete).toHaveBeenCalledWith({ where: { id: 'd1' } });
+    expect(events.emitDeviceRemoved).toHaveBeenCalledWith('u1', 'd1');
   });
 
   it('get lança NotFound quando o dispositivo não é do usuário', async () => {

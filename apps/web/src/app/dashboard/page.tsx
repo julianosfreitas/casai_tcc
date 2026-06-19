@@ -12,6 +12,7 @@ import { DeviceWidget } from '@/components/device-widget';
 import { EnergyChart } from '@/components/energy-chart';
 import { api } from '@/lib/api';
 import { getSocket } from '@/lib/socket';
+import { useDeviceSync } from '@/lib/use-device-sync';
 import { formatBRL } from '@/lib/utils';
 
 export default function DashboardPage() {
@@ -28,20 +29,19 @@ export default function DashboardPage() {
     enabled: !!energyDevice,
   });
 
-  // Tempo real: atualiza ao receber mudanças de estado/energia.
+  // Dispositivos (cadastro/remoção/estado/offline) em tempo real.
+  useDeviceSync();
+
+  // Tempo real de energia.
   React.useEffect(() => {
     const socket = getSocket();
-    const refresh = () => void qc.invalidateQueries({ queryKey: ['devices'] });
-    socket.on('device:status_changed', refresh);
-    socket.on('device:offline', refresh);
-    socket.on('energy:reading', () => {
+    const refreshEnergy = () => {
       void qc.invalidateQueries({ queryKey: ['energy'] });
       void qc.invalidateQueries({ queryKey: ['energy-history'] });
-    });
+    };
+    socket.on('energy:reading', refreshEnergy);
     return () => {
-      socket.off('device:status_changed', refresh);
-      socket.off('device:offline', refresh);
-      socket.off('energy:reading');
+      socket.off('energy:reading', refreshEnergy);
     };
   }, [qc]);
 

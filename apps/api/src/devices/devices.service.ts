@@ -98,6 +98,8 @@ export class DevicesService {
       },
       select: PUBLIC_SELECT,
     });
+    // Notifica o app em tempo real para a lista reconhecer o novo dispositivo sem reload.
+    this.events.emitDeviceCreated(userId, device.id);
     return device;
   }
 
@@ -127,6 +129,7 @@ export class DevicesService {
     await this.assertOwnership(userId, id);
     this.invalidateAdapter(id);
     await this.prisma.device.delete({ where: { id } });
+    this.events.emitDeviceRemoved(userId, id);
     return { ok: true };
   }
 

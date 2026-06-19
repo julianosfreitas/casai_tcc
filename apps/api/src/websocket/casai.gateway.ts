@@ -86,6 +86,14 @@ export class CasaiGateway extends DeviceEvents implements OnGatewayConnection, O
     this.server.to(userRoom(userId)).emit('automation:triggered', { automationId, name });
   }
 
+  emitDeviceCreated(userId: string, deviceId: string): void {
+    this.server.to(userRoom(userId)).emit('device:created', { deviceId });
+  }
+
+  emitDeviceRemoved(userId: string, deviceId: string): void {
+    this.server.to(userRoom(userId)).emit('device:removed', { deviceId });
+  }
+
   private extractToken(client: Socket): string {
     const fromAuth = (client.handshake.auth as { token?: string } | undefined)?.token;
     const fromQuery = client.handshake.query?.token;
