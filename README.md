@@ -17,7 +17,7 @@ menos de **R$ 200** em hardware, sem nuvem nem conhecimento técnico.
 > a demo do TCC. **Não existe "API Intelbras" separada** (ADR-001): a linha Izy é
 > Tuya white-label, coberta pelo mesmo `tuyapi`.
 
-## 📍 Status atual — onde paramos (19/06/2026)
+## 📍 Status atual — onde paramos (21/06/2026)
 
 **✅ Pronto e verde:** app completo (login/Google/demo, dispositivos, rotinas, cenas,
 voz, energia, gamificação, PWA, tempo real) · **Tapo P110 controlado LOCAL de verdade**
