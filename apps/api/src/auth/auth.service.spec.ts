@@ -195,11 +195,18 @@ describe('AuthService', () => {
       verifyIdToken.mockResolvedValue({
         getPayload: () => ({ sub: 'g-123', email: 'maria@gmail.com', email_verified: true }),
       });
-      users.findOrCreateGoogleUser.mockResolvedValue({ id: 'u1', email: 'maria@gmail.com' } as never);
+      users.findOrCreateGoogleUser.mockResolvedValue({
+        id: 'u1',
+        email: 'maria@gmail.com',
+      } as never);
 
       await auth.signInWithGoogle('tok');
 
-      expect(users.findOrCreateGoogleUser).toHaveBeenCalledWith('maria@gmail.com', 'maria', 'g-123');
+      expect(users.findOrCreateGoogleUser).toHaveBeenCalledWith(
+        'maria@gmail.com',
+        'maria',
+        'g-123',
+      );
     });
   });
 
