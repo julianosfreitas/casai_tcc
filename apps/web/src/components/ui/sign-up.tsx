@@ -292,18 +292,25 @@ function GlassGoogleButton({ onCredential }: { onCredential: (idToken: string) =
     const node = overlayRef.current;
     if (!scriptReady || !google || !node || !clientId) return;
     if (node.childElementCount > 0) return; // já renderizado — não duplica
-    google.accounts.id.initialize({
-      client_id: clientId,
-      callback: (response) => onCredentialRef.current(response.credential),
-    });
-    google.accounts.id.renderButton(node, {
-      type: 'standard',
-      theme: 'outline',
-      size: 'large',
-      text: 'continue_with',
-      width: 320,
-      locale: 'pt-BR',
-    });
+    // GSI pode lançar se o client_id for inválido/origem não autorizada. Isolamos
+    // num try/catch pra a falha do Google NUNCA derrubar o front do login (o usuário
+    // ainda entra por e-mail/senha). O erro de credencial real aparece no popup do Google.
+    try {
+      google.accounts.id.initialize({
+        client_id: clientId,
+        callback: (response) => onCredentialRef.current(response.credential),
+      });
+      google.accounts.id.renderButton(node, {
+        type: 'standard',
+        theme: 'outline',
+        size: 'large',
+        text: 'continue_with',
+        width: 320,
+        locale: 'pt-BR',
+      });
+    } catch (err) {
+      console.warn('[CASAI] Google Identity Services falhou ao inicializar:', err);
+    }
     return () => {
       // StrictMode (dev) monta/desmonta 2x — limpa pra render única.
       node.innerHTML = '';

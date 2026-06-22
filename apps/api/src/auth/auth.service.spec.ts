@@ -161,6 +161,46 @@ describe('AuthService', () => {
       await expect(auth.signInWithGoogle('tok')).rejects.toBeInstanceOf(UnauthorizedException);
       expect(users.findOrCreateGoogleUser).not.toHaveBeenCalled();
     });
+
+    it('rejeita quando getPayload() volta vazio', async () => {
+      withGoogleConfigured();
+      verifyIdToken.mockResolvedValue({ getPayload: () => undefined });
+
+      await expect(auth.signInWithGoogle('tok')).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(users.findOrCreateGoogleUser).not.toHaveBeenCalled();
+    });
+
+    it('rejeita payload sem sub (identificador Google ausente)', async () => {
+      withGoogleConfigured();
+      verifyIdToken.mockResolvedValue({
+        getPayload: () => ({ email: 'a@gmail.com', email_verified: true }),
+      });
+
+      await expect(auth.signInWithGoogle('tok')).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(users.findOrCreateGoogleUser).not.toHaveBeenCalled();
+    });
+
+    it('rejeita payload sem e-mail', async () => {
+      withGoogleConfigured();
+      verifyIdToken.mockResolvedValue({
+        getPayload: () => ({ sub: 'g-123', email_verified: true }),
+      });
+
+      await expect(auth.signInWithGoogle('tok')).rejects.toBeInstanceOf(UnauthorizedException);
+      expect(users.findOrCreateGoogleUser).not.toHaveBeenCalled();
+    });
+
+    it('usa o prefixo do e-mail como nome quando o Google não envia name', async () => {
+      withGoogleConfigured();
+      verifyIdToken.mockResolvedValue({
+        getPayload: () => ({ sub: 'g-123', email: 'maria@gmail.com', email_verified: true }),
+      });
+      users.findOrCreateGoogleUser.mockResolvedValue({ id: 'u1', email: 'maria@gmail.com' } as never);
+
+      await auth.signInWithGoogle('tok');
+
+      expect(users.findOrCreateGoogleUser).toHaveBeenCalledWith('maria@gmail.com', 'maria', 'g-123');
+    });
   });
 
   it('refresh rejeita token revogado', async () => {

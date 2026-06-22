@@ -32,6 +32,11 @@ services:
       # Troque pela URL final da web na Vercel (CORS).
       - key: WEB_ORIGIN
         sync: false
+      # Login com Google: MESMO Client ID do front (NEXT_PUBLIC_GOOGLE_CLIENT_ID).
+      # É público (vai embutido no bundle da web), por isso fica como value direto.
+      # Sem esta variável o backend responde 503 em POST /auth/google.
+      - key: GOOGLE_CLIENT_ID
+        value: '317087068529-phanuc0qapfup52dv35un3ipbofsjkdc.apps.googleusercontent.com'
       - key: ENERGY_POLL_INTERVAL_SECONDS
         value: '15'
 
