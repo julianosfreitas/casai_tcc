@@ -27,7 +27,10 @@ export class VoiceboxService {
   private readonly ttsLanguage: string;
 
   constructor(private readonly config: ConfigService) {
-    this.baseUrl = (this.config.get<string>('VOICEBOX_URL') ?? 'http://127.0.0.1:17493').replace(/\/$/, '');
+    this.baseUrl = (this.config.get<string>('VOICEBOX_URL') ?? 'http://127.0.0.1:17493').replace(
+      /\/$/,
+      '',
+    );
     this.defaultProfileId = this.config.get<string>('VOICEBOX_PROFILE_ID') || undefined;
     // /generate aceita apenas en|zh (engine Qwen3-TTS). pt-BR fica no fallback do navegador.
     this.ttsLanguage = this.config.get<string>('VOICEBOX_TTS_LANGUAGE') ?? 'en';
@@ -60,7 +63,12 @@ export class VoiceboxService {
     if (!res.ok) throw new Error(`GET /profiles ${res.status}`);
     const data = (await res.json()) as VoiceboxProfile[];
     return Array.isArray(data)
-      ? data.map((p) => ({ id: p.id, name: p.name, description: p.description ?? null, language: p.language ?? null }))
+      ? data.map((p) => ({
+          id: p.id,
+          name: p.name,
+          description: p.description ?? null,
+          language: p.language ?? null,
+        }))
       : [];
   }
 
@@ -85,13 +93,19 @@ export class VoiceboxService {
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ text, profile_id: profile, language: language || this.ttsLanguage }),
+          body: JSON.stringify({
+            text,
+            profile_id: profile,
+            language: language || this.ttsLanguage,
+          }),
         },
         8000,
       );
     } catch (err) {
       this.logger.warn(`Voicebox indisponível: ${(err as Error).message}`);
-      throw new ServiceUnavailableException('Voicebox não está acessível (app rodando em 127.0.0.1:17493?).');
+      throw new ServiceUnavailableException(
+        'Voicebox não está acessível (app rodando em 127.0.0.1:17493?).',
+      );
     }
     if (!genRes.ok) {
       throw new ServiceUnavailableException(`Voicebox /generate falhou (${genRes.status}).`);
@@ -102,7 +116,9 @@ export class VoiceboxService {
 
     // Poll do áudio até ficar pronto (síntese é assíncrona/enfileirada).
     for (let i = 0; i < 30; i++) {
-      const audioRes = await this.fetchWithTimeout(`/audio/${id}`, { method: 'GET' }, 4000).catch(() => null);
+      const audioRes = await this.fetchWithTimeout(`/audio/${id}`, { method: 'GET' }, 4000).catch(
+        () => null,
+      );
       if (audioRes && audioRes.ok) {
         const ct = audioRes.headers.get('content-type') ?? 'audio/wav';
         const buf = Buffer.from(await audioRes.arrayBuffer());
@@ -126,7 +142,8 @@ export class VoiceboxService {
     } catch (err) {
       throw new ServiceUnavailableException(`Voicebox STT indisponível: ${(err as Error).message}`);
     }
-    if (!res.ok) throw new ServiceUnavailableException(`Voicebox /transcribe falhou (${res.status}).`);
+    if (!res.ok)
+      throw new ServiceUnavailableException(`Voicebox /transcribe falhou (${res.status}).`);
     const data = (await res.json()) as { text?: string; transcript?: string };
     return (data.text ?? data.transcript ?? '').trim();
   }

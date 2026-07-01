@@ -17,6 +17,7 @@
     "!src/devices/adapters/tuya.adapter.ts",
     "!src/devices/adapters/tapo.adapter.ts",
     "!src/voice/whisper.stt.ts",
+    "!src/voice/voicebox.service.ts",
     "!src/devices/discovery/network-scanner.service.ts",
     "!src/demo/demo-seed.service.ts"
   ],

@@ -22,8 +22,11 @@ import { DevicesModule } from '../devices/devices.module';
     {
       provide: SpeechToText,
       inject: [ConfigService, WhisperSttService, VoiceboxSttService],
-      useFactory: (config: ConfigService, whisper: WhisperSttService, voicebox: VoiceboxSttService) =>
-        config.get<string>('VOICE_STT_ENGINE') === 'voicebox' ? voicebox : whisper,
+      useFactory: (
+        config: ConfigService,
+        whisper: WhisperSttService,
+        voicebox: VoiceboxSttService,
+      ) => (config.get<string>('VOICE_STT_ENGINE') === 'voicebox' ? voicebox : whisper),
     },
   ],
   exports: [VoiceCommandParser],
